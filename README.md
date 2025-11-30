@@ -4,98 +4,126 @@ emoji: 🧠
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 6.0.1
+sdk_version: 5.0.0
 app_file: app.py
 pinned: false
 license: mit
+tags:
+  - building-mcp-track-creative
+  - mcp-in-action-track-creative
+  - agent-course
+  - agents
+  - manim
+  - education
+  - mcp
 ---
 
 # 🧠 NeuroAnim - AI-Powered Educational Animation Generator
 
-NeuroAnim is an AI-powered system that automatically generates educational STEM animations with narration and quiz questions. Simply enter a topic, and watch as AI creates a complete animated video!
-
-## 🎯 Features
-
-- **🎨 Automatic Animation Generation**: Creates professional Manim animations from topic descriptions
-- **🗣️ AI Narration**: Generates educational narration scripts tailored to your audience
-- **🔊 Text-to-Speech**: Converts narration to high-quality audio
-- **📹 Video Production**: Renders and merges video with synchronized audio
-- **❓ Quiz Generation**: Creates assessment questions to test understanding
-- **🎓 Multi-Level Support**: Content appropriate for elementary through PhD levels
-
-## 🚀 How to Use
-
-1. **Enter a Topic**: Type any STEM concept (e.g., "Pythagorean Theorem", "Photosynthesis", "Newton's Laws")
-2. **Select Audience**: Choose the appropriate education level
-3. **Set Duration**: Pick animation length (0.5-10 minutes)
-4. **Choose Quality**: Select video quality (higher = slower but better)
-5. **Generate**: Click the button and wait for your animation!
-
-## 💡 Example Topics
-
-- **Mathematics**: Pythagorean Theorem, Quadratic Formula, Circle Area Derivation
-- **Physics**: Newton's Laws, Laws of Motion, Wave Properties
-- **Biology**: Photosynthesis, Cell Division, DNA Structure
-- **Computer Science**: Binary Numbers, Sorting Algorithms, Data Structures
-
-## 🔧 Technology Stack
-
-- **Manim Community Edition**: Mathematical animation engine
-- **Hugging Face Models**: AI-powered content generation
-- **ElevenLabs**: High-quality text-to-speech synthesis
-- **Blaxel**: Cloud-based secure rendering
-- **Gradio**: Interactive web interface
-
-## 🔑 Setup Requirements
-
-To run this space, you need:
-
-1. **Hugging Face API Key**: For AI content generation (required)
-2. **ElevenLabs API Key**: For high-quality TTS (optional, falls back to HF TTS)
-3. **Blaxel API Key**: For cloud rendering (optional, can use local rendering)
-
-Set these as **Secrets** in your Hugging Face Space settings:
-- `HUGGINGFACE_API_KEY`
-- `ELEVENLABS_API_KEY` (optional)
-- `BLAXEL_API_KEY` (optional)
-- `MANIM_SANDBOX_IMAGE` (optional, for Blaxel cloud rendering)
-
-## 📝 Tips for Best Results
-
-- **Be Specific**: Instead of "math", try "solving linear equations" or "area of a circle"
-- **Choose Right Audience**: Match the complexity level to your target viewers
-- **Optimal Duration**: 1.5-3 minutes works best for most concepts
-- **Review Generated Content**: Check the narration and code tabs to see what was created
-
-## 🎬 How It Works
-
-1. **Concept Planning**: AI analyzes your topic and creates an educational plan
-2. **Script Writing**: Generates age-appropriate narration aligned with learning objectives
-3. **Code Generation**: Creates Manim Python code for visual representation
-4. **Rendering**: Executes Manim to produce the base animation
-5. **Audio Synthesis**: Converts narration to speech using TTS
-6. **Final Production**: Merges video and audio into complete animation
-7. **Assessment**: Generates quiz questions for the content
-
-## 📚 Use Cases
-
-- **Teachers**: Create engaging lesson materials
-- **Students**: Visualize complex concepts for better understanding
-- **Content Creators**: Produce educational YouTube/social media content
-- **Tutors**: Generate custom explanations for specific topics
-- **Course Developers**: Build comprehensive educational video libraries
-
-## 🤝 Contributing
-
-NeuroAnim is open source! Visit the [GitHub repository](https://github.com/yourusername/manim-agent) to:
-- Report bugs or suggest features
-- Submit pull requests with improvements
-- Share your generated animations
-
-## 📄 License
-
-MIT License - Free to use for educational and commercial purposes
+**NeuroAnim** is an autonomous AI agent that generates professional-quality educational STEM animations. It orchestrates multiple AI models and tools using the **Model Context Protocol (MCP)** to plan, script, code, render, and narrate educational videos automatically.
 
 ---
 
-Made with ❤️ for educational content creation
+## 🏆 Hackathon Submission
+
+This project is submitted to the **MCP Hackathon** under the following tracks:
+
+### 🔧 Track 1: Building MCP (Creative)
+**Tag:** `building-mcp-track-creative`
+We built two custom MCP servers that extend LLM capabilities:
+1.  **`mcp-renderer`**: A specialized server for Manim code generation, validation, and secure sandboxed rendering using **Blaxel**.
+2.  **`mcp-creative`**: A creative server for educational concept planning, scriptwriting, and quiz generation using **Hugging Face** models.
+
+### 🤖 Track 2: MCP in Action (Creative)
+**Tag:** `mcp-in-action-track-creative`
+NeuroAnim is a complete autonomous agent that:
+- **Plans**: Deconstructs complex STEM topics into teachable concepts.
+- **Reasons**: Decides on the best visual metaphors and analogies for the target audience.
+- **Executes**: Writes Python code, renders video, generates audio, and merges assets into a final product.
+
+### 🏢 Sponsor Integrations
+- **Blaxel**: Used for secure, scalable cloud rendering of Manim animations (Blaxel Choice Award).
+- **ElevenLabs**: Used for high-quality, life-like narration (ElevenLabs Category Award).
+- **Hugging Face**: Hosted on Spaces, utilizing HF Inference API for reasoning and generation.
+
+---
+
+## 🔗 Submission Links
+
+- **Social Media Post**: [LINK_TO_SOCIAL_MEDIA_POST] (e.g., X/Twitter, LinkedIn)
+- **Demo Video**: [LINK_TO_DEMO_VIDEO] (YouTube/Loom)
+
+---
+
+## 👥 Team Members
+
+- **[Your_HF_Username]**
+- *[Add other team members here]*
+
+---
+
+## 🎯 Features
+
+- **🎨 Automatic Animation Generation**: Creates professional Manim animations from topic descriptions.
+- **🗣️ AI Narration**: Generates educational narration scripts tailored to your audience.
+- **🔊 Text-to-Speech**: Converts narration to high-quality audio using **ElevenLabs** (or HF fallback).
+- **☁️ Cloud Rendering**: Uses **Blaxel** sandboxes for secure and fast video rendering.
+- **❓ Quiz Generation**: Creates assessment questions to test understanding.
+- **🎓 Multi-Level Support**: Content appropriate for elementary through PhD levels.
+
+## 🚀 How to Use
+
+1.  **Enter a Topic**: Type any STEM concept (e.g., "Pythagorean Theorem", "Photosynthesis", "Newton's Laws").
+2.  **Select Audience**: Choose the appropriate education level.
+3.  **Set Duration**: Pick animation length (0.5-10 minutes).
+4.  **Generate**: Click the button and watch the agent work!
+
+## 🔧 Technology Stack & Architecture
+
+NeuroAnim uses a modular agentic architecture built on **MCP**:
+
+### 1. The Orchestrator (Agent)
+The central brain that coordinates the workflow. It connects to MCP servers to execute tasks.
+
+### 2. Renderer MCP Server (`mcp-servers/renderer.py`)
+- **Tools**: `write_manim_file`, `render_manim_animation`, `merge_video_audio`
+- **Tech**: **Blaxel** (Sandboxed Execution), **FFmpeg**, **Manim Community**
+- **Innovation**: Solves the "arbitrary code execution" risk by running generated Python code in secure Blaxel sandboxes.
+
+### 3. Creative MCP Server (`mcp-servers/creative.py`)
+- **Tools**: `plan_concept`, `generate_narration`, `generate_manim_code`, `generate_quiz`
+- **Tech**: **Hugging Face Inference API** (Qwen/Llama models), **ElevenLabs API**
+- **Innovation**: Uses chain-of-thought prompting to ensure educational accuracy and visual creativity.
+
+## 🔑 Setup Requirements
+
+To run this space, you need to configure the following **Secrets** in your Space settings:
+
+1.  `HUGGINGFACE_API_KEY` (Required): For AI content generation.
+2.  `ELEVENLABS_API_KEY` (Optional): For high-quality narration (highly recommended).
+3.  `BLAXEL_API_KEY` (Optional): For cloud rendering (recommended for speed/security).
+4.  `MANIM_SANDBOX_IMAGE` (Optional): Custom Blaxel image for Manim.
+
+## 📝 Tips for Best Results
+
+- **Be Specific**: Instead of "math", try "solving linear equations" or "area of a circle".
+- **Choose Right Audience**: Match the complexity level to your target viewers.
+- **Optimal Duration**: 1.5-3 minutes works best for most concepts.
+
+## 📚 Use Cases
+
+- **Teachers**: Create engaging lesson materials.
+- **Students**: Visualize complex concepts for better understanding.
+- **Content Creators**: Produce educational YouTube/social media content.
+
+## 🤝 Contributing
+
+NeuroAnim is open source! We welcome contributions to extend the MCP capabilities or add new visualization styles.
+
+## 📄 License
+
+MIT License - Free to use for educational and commercial purposes.
+
+---
+
+*Made with ❤️ for the MCP Hackathon*
