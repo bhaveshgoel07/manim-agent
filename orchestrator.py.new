@@ -167,6 +167,8 @@ class NeuroAnimOrchestrator:
         target_audience: str = "general",
         animation_length_minutes: float = 2.0,
         output_filename: str = "animation.mp4",
+        quality: str = "medium",
+        progress_callback: Optional[callable] = None,
     ) -> Dict[str, Any]:
         """Complete animation generation pipeline."""
 
@@ -175,6 +177,8 @@ class NeuroAnimOrchestrator:
 
             # Step 1: Concept Planning
             logger.info("Step 1: Planning concept...")
+            if progress_callback:
+                progress_callback("Planning concept", 0.1)
             concept_result = await self.call_tool(
                 self.creative_session,
                 "plan_concept",
@@ -193,6 +197,8 @@ class NeuroAnimOrchestrator:
 
             # Step 2: Generate Narration
             logger.info("Step 2: Generating narration...")
+            if progress_callback:
+                progress_callback("Generating narration script", 0.25)
             narration_result = await self.call_tool(
                 self.creative_session,
                 "generate_narration",
@@ -209,13 +215,21 @@ class NeuroAnimOrchestrator:
                     f"Narration generation failed: {narration_result['text']}"
                 )
 
-            narration_text = narration_result["text"]
+            # Clean narration text - remove title/prefix before TTS
+            narration_text = self._clean_narration_text(narration_result["text"])
             logger.info("Narration generation completed")
+            logger.info(f"Narration preview: {narration_text[:100]}...")
 
             # Step 3: Generate Manim Code with retry logic
             logger.info("Step 3: Generating Manim code...")
+            if progress_callback:
+                progress_callback("Creating Manim animation code", 0.40)
+            target_duration_seconds = int(animation_length_minutes * 60)
             manim_code = await self._generate_and_validate_code(
-                topic=topic, concept_plan=concept_plan, max_retries=3
+                topic=topic,
+                concept_plan=concept_plan,
+                duration_seconds=target_duration_seconds,
+                max_retries=3,
             )
             logger.info("Manim code generation completed and validated")
 
@@ -235,33 +249,108 @@ class NeuroAnimOrchestrator:
             scene_name = self._extract_scene_name(manim_code)
             logger.info(f"Scene name detected: {scene_name}")
 
-            # Step 5: Render Animation
+            # Step 5: Render Animation with retry on runtime errors
             logger.info("Step 5: Rendering animation...")
-            render_result = await self.call_tool(
-                self.renderer_session,
-                "render_manim_animation",
-                {
-                    "scene_name": scene_name,
-                    "file_path": str(manim_file),
-                    "output_dir": str(self.work_dir),
-                    "quality": "medium",
-                    "format": "mp4",
-                    "frame_rate": 30,
-                },
-            )
+            if progress_callback:
+                progress_callback("Rendering animation video", 0.55)
+            max_render_retries = 5
+            video_file = None
+            
+            for render_attempt in range(max_render_retries):
+                render_result = await self.call_tool(
+                    self.renderer_session,
+                    "render_manim_animation",
+                    {
+                        "scene_name": scene_name,
+                        "file_path": str(manim_file),
+                        "output_dir": str(self.work_dir),
+                        "quality": quality,  # Use the quality parameter
+                        "format": "mp4",
+                        "frame_rate": 30,
+                    },
+                )
 
-            if render_result["isError"]:
-                raise Exception(f"Rendering failed: {render_result['text']}")
-
-            # Find rendered video file
-            video_file = self._find_output_file(self.work_dir, scene_name, "mp4")
+                if not render_result["isError"]:
+                    # Success! Find the rendered file
+                    video_file = self._find_output_file(self.work_dir, scene_name, "mp4")
+                    if video_file:
+                        # Check video duration
+                        try:
+                            actual_duration = self._get_video_duration(video_file)
+                            logger.info(f"Rendered video duration: {actual_duration:.2f}s (Target: {target_duration_seconds}s)")
+                            
+                            if actual_duration < target_duration_seconds * 0.5:
+                                logger.warning(f"Video is too short ({actual_duration:.2f}s < {target_duration_seconds * 0.5}s). Forcing retry...")
+                                error_text = (
+                                    f"The generated animation was TOO SHORT ({actual_duration:.1f}s). "
+                                    f"The target duration is {target_duration_seconds}s. "
+                                    "You MUST make the animation longer by adding more `self.wait()` calls "
+                                    "and ensuring animations play slower (use run_time parameter)."
+                                )
+                                # Fall through to error handling logic below
+                            else:
+                                break
+                        except Exception as e:
+                            logger.warning(f"Could not verify video duration: {e}")
+                            break
+                    else:
+                        logger.warning("Render succeeded but could not find output file")
+                        if render_attempt < max_render_retries - 1:
+                            continue
+                
+                # Rendering failed - check if it's a runtime error we can fix
+                error_text = render_result["text"]
+                logger.warning(f"Render attempt {render_attempt + 1} failed: {error_text[:200]}...")
+                
+                # Check if this is a Manim runtime error (not a "no scene" error)
+                if render_attempt < max_render_retries - 1 and (
+                    "TypeError" in error_text 
+                    or "AttributeError" in error_text 
+                    or "ValueError" in error_text
+                    or "KeyError" in error_text
+                ):
+                    logger.info(f"Detected runtime error in Manim code. Regenerating code (attempt {render_attempt + 2}/{max_render_retries})...")
+                    
+                    # Regenerate code with error feedback
+                    runtime_error_msg = f"Runtime Error during Manim rendering:\n{error_text}\n\nPlease fix the code to be compatible with Manim version 0.19.0."
+                    manim_code = await self._generate_and_validate_code(
+                        topic=topic,
+                        concept_plan=concept_plan,
+                        duration_seconds=target_duration_seconds,
+                        max_retries=3,  # Allow retries for syntax errors during fix
+                        previous_error=runtime_error_msg,
+                        previous_code=manim_code,
+                    )
+                    
+                    # Write the new code
+                    write_result = await self.call_tool(
+                        self.renderer_session,
+                        "write_manim_file",
+                        {"filepath": str(manim_file), "code": manim_code},
+                    )
+                    
+                    if write_result["isError"]:
+                        raise Exception(f"File writing failed: {write_result['text']}")
+                    
+                    # Extract scene name from new code
+                    scene_name = self._extract_scene_name(manim_code)
+                    logger.info(f"Regenerated code with scene: {scene_name}")
+                    
+                    # Loop will retry rendering with new code
+                    continue
+                else:
+                    # Not a runtime error or out of retries
+                    raise Exception(f"Rendering failed: {error_text}")
+            
             if not video_file:
-                raise Exception("Could not find rendered video file")
+                raise Exception("Could not find rendered video file after all attempts")
 
             logger.info(f"Animation rendered: {video_file}")
 
             # Step 6: Generate Speech Audio
             logger.info("Step 6: Generating speech audio...")
+            if progress_callback:
+                progress_callback("Generating audio narration", 0.75)
             audio_file = self.work_dir / "narration.mp3"
 
             # Use TTS generator with automatic fallback
@@ -291,6 +380,8 @@ class NeuroAnimOrchestrator:
 
             # Step 7: Merge Video and Audio
             logger.info("Step 7: Merging video and audio...")
+            if progress_callback:
+                progress_callback("Merging video and audio", 0.90)
             final_output = self.output_dir / output_filename
             merge_result = await self.call_tool(
                 self.renderer_session,
@@ -307,6 +398,8 @@ class NeuroAnimOrchestrator:
 
             # Step 8: Generate Quiz
             logger.info("Step 8: Generating quiz...")
+            if progress_callback:
+                progress_callback("Creating quiz questions", 0.95)
             quiz_result = await self.call_tool(
                 self.creative_session,
                 "generate_quiz",
@@ -348,28 +441,68 @@ class NeuroAnimOrchestrator:
                 "work_dir": str(self.work_dir) if self.work_dir else None,
             }
 
-    def _extract_python_code(self, response_text: str) -> str:
+    def _clean_narration_text(self, text: str) -> str:
+        """
+        Clean narration text by removing title prefixes and formatting artifacts.
+
+        The creative server returns text with prefixes like "Narration Script:\n\n"
+        which should not be sent to TTS.
+        """
+        # Remove common prefixes
+        prefixes_to_remove = [
+            "Narration Script:",
+            "Script:",
+            "Narration:",
+            "Text:",
+        ]
+
+        cleaned = text.strip()
+
+        # Remove any of the prefixes (case-insensitive)
+        for prefix in prefixes_to_remove:
+            if cleaned.lower().startswith(prefix.lower()):
+                cleaned = cleaned[len(prefix) :].strip()
+                break
+
+        # Remove leading newlines and whitespace
+        cleaned = cleaned.lstrip("\n").strip()
+
+        # Remove any markdown code block markers
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            # Remove first line (opening ```)
+            if len(lines) > 1:
+                lines = lines[1:]
+            # Remove last line if it's closing ```
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+
+        return cleaned
+
+    def _extract_python_code(self, text: str) -> str:
         """Extract Python code from markdown response."""
         # Look for code blocks
-        if "```python" in response_text:
-            start = response_text.find("```python") + 9
-            end = response_text.find("```", start)
+        if "```python" in text:
+            start = text.find("```python") + 9
+            end = text.find("```", start)
             if end == -1:
-                end = len(response_text)
-            return response_text[start:end].strip()
-        elif "```" in response_text:
-            start = response_text.find("```") + 3
-            end = response_text.find("```", start)
+                end = len(text)
+            return text[start:end].strip()
+        elif "```" in text:
+            start = text.find("```") + 3
+            end = text.find("```", start)
             if end == -1:
-                end = len(response_text)
-            return response_text[start:end].strip()
+                end = len(text)
+            return text[start:end].strip()
         else:
-            return response_text.strip()
+            return text.strip()
 
     async def _generate_and_validate_code(
         self,
         topic: str,
         concept_plan: str,
+        duration_seconds: int = 60,
         max_retries: int = 3,
         previous_error: Optional[str] = None,
         previous_code: Optional[str] = None,
@@ -384,11 +517,13 @@ class NeuroAnimOrchestrator:
                     "concept": topic,
                     "scene_description": concept_plan,
                     "visual_elements": ["text", "shapes", "animations"],
+                    "duration_seconds": duration_seconds,
                 }
 
                 # If this is a retry, include error feedback
-                if previous_error and previous_code:
-                    arguments["previous_code"] = previous_code
+                if previous_error:
+                    if previous_code:
+                        arguments["previous_code"] = previous_code
                     arguments["error_message"] = previous_error
                     logger.info(
                         f"Retrying with error feedback: {previous_error[:100]}..."
@@ -405,6 +540,7 @@ class NeuroAnimOrchestrator:
                             f"Code generation failed, retrying: {code_result['text']}"
                         )
                         previous_error = code_result["text"]
+                        # Keep previous_code if we had it, for better context in retry
                         continue
                     else:
                         raise Exception(
@@ -429,6 +565,25 @@ class NeuroAnimOrchestrator:
                             f"Generated code has syntax errors after {max_retries} attempts:\n{syntax_errors}"
                         )
 
+                # Validate that code contains a Scene class
+                has_scene = self._validate_has_scene_class(manim_code)
+                if not has_scene:
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            "No Scene class found in generated code, retrying..."
+                        )
+                        previous_error = (
+                            "Error: The generated code does not contain any Scene class. "
+                            "Please ensure you create a class that inherits from manim.Scene, "
+                            "manim.MovingCameraScene, or manim.ThreeDScene."
+                        )
+                        previous_code = manim_code
+                        continue
+                    else:
+                        raise Exception(
+                            f"Generated code does not contain a Scene class after {max_retries} attempts"
+                        )
+
                 # Success!
                 logger.info(f"Valid code generated on attempt {attempt + 1}")
                 return manim_code
@@ -449,23 +604,101 @@ class NeuroAnimOrchestrator:
             ast.parse(code)
             return None
         except SyntaxError as e:
+            # Build detailed error message with context
             error_msg = f"Line {e.lineno}: {e.msg}"
-            if e.text:
-                error_msg += f"\n  {e.text.rstrip()}"
-                if e.offset:
-                    error_msg += f"\n  {' ' * (e.offset - 1)}^"
+
+            # Show surrounding context (3 lines before and after)
+            if e.lineno is not None:
+                code_lines = code.split("\n")
+                start_line = max(0, e.lineno - 4)  # 3 lines before
+                end_line = min(len(code_lines), e.lineno + 2)  # 2 lines after
+
+                error_msg += "\n\nContext:"
+                for i in range(start_line, end_line):
+                    line_num = i + 1
+                    prefix = ">>> " if line_num == e.lineno else "    "
+                    error_msg += f"\n{prefix}{line_num:3d} | {code_lines[i]}"
+
+                    # Add pointer for error line
+                    if line_num == e.lineno and e.offset:
+                        error_msg += f"\n    {' ' * 4}{' ' * (e.offset - 1)}^"
+
             return error_msg
         except Exception as e:
             return f"Unexpected error during syntax validation: {str(e)}"
+
+    def _validate_has_scene_class(self, code: str) -> bool:
+        """Check if code contains at least one Scene class."""
+        import re
+        
+        # Check for Scene class inheritance
+        scene_patterns = [
+            r"class\s+\w+\s*\(\s*Scene\s*\)",
+            r"class\s+\w+\s*\(\s*MovingCameraScene\s*\)",
+            r"class\s+\w+\s*\(\s*ThreeDScene\s*\)",
+            r"class\s+\w+\s*\(\s*\w*Scene\s*\)",
+        ]
+        
+        for pattern in scene_patterns:
+            if re.search(pattern, code):
+                return True
+        
+        # Also check using AST parsing as a backup
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    # Check if any base class contains "Scene"
+                    for base in node.bases:
+                        if isinstance(base, ast.Name) and "Scene" in base.id:
+                            return True
+        except Exception:
+            pass
+        
+        return False
 
     def _extract_scene_name(self, code: str) -> str:
         """Extract scene class name from Manim code."""
         import re
 
-        # Look for class definition that inherits from Scene, MovingCameraScene, etc.
-        match = re.search(r"class\s+(\w+)\s*\(\s*\w*Scene\s*\)", code)
-        if match:
-            return match.group(1)
+        # Try multiple patterns to find Scene class
+        patterns = [
+            r"class\s+(\w+)\s*\(\s*Scene\s*\)",  # class Name(Scene)
+            r"class\s+(\w+)\s*\(\s*MovingCameraScene\s*\)",  # class Name(MovingCameraScene)
+            r"class\s+(\w+)\s*\(\s*ThreeDScene\s*\)",  # class Name(ThreeDScene)
+            r"class\s+(\w+)\s*\(\s*\w*Scene\s*\)",  # class Name(AnyScene)
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, code)
+            if match:
+                scene_name = match.group(1)
+                logger.info(f"Found scene class: {scene_name}")
+                return scene_name
+        
+        # If no scene found, look for any class definition and warn
+        any_class = re.search(r"class\s+(\w+)\s*\(", code)
+        if any_class:
+            class_name = any_class.group(1)
+            logger.warning(
+                f"Could not find Scene class, using first class found: {class_name}"
+            )
+            return class_name
+        
+        # Last resort - parse the AST to find classes
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    logger.warning(
+                        f"Using first class from AST parsing: {node.name}"
+                    )
+                    return node.name
+        except Exception as e:
+            logger.error(f"Failed to parse code AST: {e}")
+        
+        # Absolute fallback
+        logger.error("No scene class found in code! This will likely cause rendering to fail.")
         return "Scene"  # fallback
 
     def _find_output_file(
