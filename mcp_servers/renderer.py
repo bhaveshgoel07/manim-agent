@@ -1352,14 +1352,23 @@ async def merge_video_audio(arguments: Dict[str, Any]) -> CallToolResult:
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         # Build FFmpeg merge command
+        # Build FFmpeg merge command
+        # Use tpad to extend the video stream to match audio duration (hold last frame)
+        # Then use -shortest to cut at the end of the audio
         cmd = [
             "ffmpeg",
             "-i",
             video_file,
             "-i",
             audio_file,
+            "-filter_complex",
+            "[0:v]tpad=stop_mode=clone:stop_duration=-1[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "1:a",
             "-c:v",
-            "copy",
+            "libx264",  # Must re-encode to extend video
             "-c:a",
             "aac",
             "-shortest",
