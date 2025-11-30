@@ -50,8 +50,8 @@ NeuroAnim is a complete autonomous agent that:
 
 ## 🔗 Submission Links
 
-- **Social Media Post**: [LINK_TO_SOCIAL_MEDIA_POST] (e.g., X/Twitter, LinkedIn)
-- **Demo Video**: [LINK_TO_DEMO_VIDEO] (YouTube/Loom)
+- **Social Media Post**: [X (Twitter) Post](https://x.com/trashdeployer/status/1995281046594834458)
+- **Demo Video**: [Watch Demo](https://docs.google.com/document/d/1pCK3H0_wr4_Tbg2JwFNtipWaHERc2y_0lv7H_4QUhz0/edit?usp=sharing)
 
 ---
 
