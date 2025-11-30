@@ -1,0 +1,35 @@
+[project]
+name = "neuroanim"
+version = "0.1.0"
+description = "Modular STEM animation generator using MCP and Hugging Face"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp>=1.0.0",
+    "langgraph>=0.0.26",
+    "langchain-core>=0.1.0",
+    "huggingface_hub>=0.25.0",
+    "manim>=0.18.1",
+    "pydantic>=2.0.0",
+    "aiohttp>=3.8.0",
+    "httpx>=0.24.0",
+    "numpy>=1.24.0",
+    "Pillow>=10.0.0",
+    "gtts>=2.3.0",
+    "pydub>=0.25.0",
+    "python-dotenv>=1.0.0",
+    "elevenlabs>=0.2.0",
+    "blaxel>=0.1.0",
+    "gradio>=4.0.0",
+    "textstat>=0.7.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
