@@ -1,12 +1,12 @@
 # Core dependencies for Hugging Face Spaces
-gradio>=6.0.0
+gradio>=5.0.0
 python-dotenv>=1.0.0
 
 # AI and LLM
 mcp>=1.0.0
 langgraph>=0.0.26
 langchain-core>=0.1.0
-huggingface-hub>=0.25.0
+huggingface-hub>=0.25.1
 
 # Animation and rendering
 manim>=0.18.1
