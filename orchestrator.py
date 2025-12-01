@@ -167,11 +167,21 @@ class NeuroAnimOrchestrator:
         target_audience: str = "general",
         animation_length_minutes: float = 2.0,
         output_filename: str = "animation.mp4",
+        quality: str = "medium",
+        progress_callback: Optional[Callable[[str, float], None]] = None,
     ) -> Dict[str, Any]:
         """Complete animation generation pipeline."""
 
+        def report_progress(step: str, progress: float):
+            if progress_callback:
+                try:
+                    progress_callback(step, progress)
+                except Exception as e:
+                    logger.warning(f"Progress callback failed: {e}")
+
         try:
             logger.info(f"Starting animation generation for: {topic}")
+            report_progress("Planning concept", 0.1)
 
             # Step 1: Concept Planning
             logger.info("Step 1: Planning concept...")
@@ -190,6 +200,7 @@ class NeuroAnimOrchestrator:
 
             concept_plan = concept_result["text"]
             logger.info("Concept planning completed")
+            report_progress("Generating narration script", 0.25)
 
             # Step 2: Generate Narration
             logger.info("Step 2: Generating narration...")
@@ -211,6 +222,7 @@ class NeuroAnimOrchestrator:
 
             narration_text = narration_result["text"]
             logger.info("Narration generation completed")
+            report_progress("Creating Manim animation code", 0.40)
 
             # Step 3: Generate Manim Code with retry logic
             logger.info("Step 3: Generating Manim code...")
@@ -234,6 +246,7 @@ class NeuroAnimOrchestrator:
             # Extract scene name from code
             scene_name = self._extract_scene_name(manim_code)
             logger.info(f"Scene name detected: {scene_name}")
+            report_progress("Rendering animation video", 0.55)
 
             # Step 5: Render Animation
             logger.info("Step 5: Rendering animation...")
@@ -244,7 +257,7 @@ class NeuroAnimOrchestrator:
                     "scene_name": scene_name,
                     "file_path": str(manim_file),
                     "output_dir": str(self.work_dir),
-                    "quality": "medium",
+                    "quality": quality,
                     "format": "mp4",
                     "frame_rate": 30,
                 },
@@ -259,6 +272,7 @@ class NeuroAnimOrchestrator:
                 raise Exception("Could not find rendered video file")
 
             logger.info(f"Animation rendered: {video_file}")
+            report_progress("Generating audio narration", 0.75)
 
             # Step 6: Generate Speech Audio
             logger.info("Step 6: Generating speech audio...")
@@ -289,6 +303,8 @@ class NeuroAnimOrchestrator:
                 logger.error(f"TTS generation failed: {e}")
                 raise Exception(f"Speech generation failed: {str(e)}")
 
+            report_progress("Merging video and audio", 0.90)
+
             # Step 7: Merge Video and Audio
             logger.info("Step 7: Merging video and audio...")
             final_output = self.output_dir / output_filename
@@ -304,6 +320,33 @@ class NeuroAnimOrchestrator:
 
             if merge_result["isError"]:
                 raise Exception(f"Merging failed: {merge_result['text']}")
+
+            logger.info(f"Final video created: {final_output}")
+            report_progress("Creating quiz questions", 0.95)
+
+            # Step 8: Generate Quiz
+            logger.info("Step 8: Generating quiz...")
+            quiz_result = await self.call_tool(
+                self.creative_session,
+                "generate_quiz",
+                {"topic": topic, "target_audience": target_audience},
+            )
+            quiz_content = (
+                quiz_result["text"] if not quiz_result["isError"] else "Not available"
+            )
+
+            report_progress("Finalizing", 1.0)
+
+            return {
+                "success": True,
+                "output_file": str(final_output),
+                "topic": topic,
+                "target_audience": target_audience,
+                "concept_plan": concept_plan,
+                "narration": narration_text,
+                "manim_code": manim_code,
+                "quiz": quiz_content,
+            }
 
             # Step 8: Generate Quiz
             logger.info("Step 8: Generating quiz...")
