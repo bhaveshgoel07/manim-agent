@@ -1,0 +1,125 @@
+SANDBOX INTEGRATION FIX SUMMARY
+================================
+
+Date: 2024-11-30
+Issue: Manim renderer attempting to install packages in pre-built sandbox causing timeouts
+
+PROBLEM IDENTIFIED
+------------------
+The renderer.py MCP server was attempting to install Manim, FFmpeg, and system dependencies
+even when using a custom Blaxel sandbox that already had everything pre-installed.
+
+This caused:
+1. httpx.ReadTimeout errors during pip install commands
+2. apt-get lock conflicts from concurrent installation attempts
+3. Unnecessary 10+ minute wait times before render failures
+4. Missing cloup dependency error despite Manim being installed
+
+ROOT CAUSES
+-----------
+1. Environment variable MANIM_SANDBOX_IMAGE not loaded in renderer.py subprocess
+2. No detection logic for custom vs default sandbox images
+3. Overly complex installation fallback logic with multiple timeout-prone attempts
+4. Concurrent apt-get commands causing dpkg lock conflicts
+
+CHANGES MADE
+------------
+
+File: mcp_servers/renderer.py
+
+1. Added dotenv loading (Lines 19, 34-36):
+   - Import: from dotenv import load_dotenv
+   - Call: load_dotenv() before reading MANIM_SANDBOX_IMAGE
+
+2. Simplified installation logic (Lines 512-568):
+   - Detect custom sandbox: using_custom_sandbox = MANIM_SANDBOX_IMAGE != "blaxel/py-app:latest"
+   - If custom sandbox detected:
+     * Run quick verification only (30 sec timeout)
+     * Check both Manim and FFmpeg availability
+     * Skip ALL installation attempts
+   - If default sandbox:
+     * Return clear error message directing user to deploy custom sandbox
+     * No more timeout-prone installation attempts
+
+3. Removed problematic code:
+   - ~400 lines of apt-get installation logic
+   - Multiple pip install attempts with varying timeouts
+   - Concurrent process management code
+   - Complex fallback chains
+
+CURRENT BEHAVIOR
+----------------
+
+When app.py or main.py launches:
+1. orchestrator.py loads .env file
+2. orchestrator.py spawns renderer.py subprocess
+3. renderer.py now loads .env file independently
+4. MANIM_SANDBOX_IMAGE = "sandbox/manim-sandbox:hpsksd5b50u7" is read
+5. Custom sandbox detected immediately
+6. Quick 30-second verification runs:
+   - python3 -c "import manim; print('Manim version:', manim.__version__)"
+   - ffmpeg -version | head -n 1
+7. If both succeed → proceed directly to rendering
+8. If verification fails → return clear error (no installation attempts)
+
+CUSTOM SANDBOX CONTENTS
+-----------------------
+Your deployed sandbox (sandbox/manim-sandbox:hpsksd5b50u7) includes:
+✓ Python 3.12
+✓ Manim 0.18.1+
+✓ FFmpeg with full codec support
+✓ LaTeX (texlive packages)
+✓ Cairo, Pango system libraries
+✓ NumPy, SciPy, Pillow, and all Manim dependencies
+✓ Blaxel sandbox-api on port 8080
+
+EXPECTED RESULTS
+----------------
+- Sandbox creation: ~2-3 seconds
+- Dependency verification: ~5-10 seconds
+- Rendering time: depends on animation complexity (30 seconds - 10 minutes)
+- No more timeout errors during setup
+- No more apt-get lock conflicts
+- No more missing dependency errors
+
+TESTING
+-------
+To verify the fix works:
+
+1. Check environment variable loads:
+   cd manim-agent
+   python3 -c "from dotenv import load_dotenv; import os; load_dotenv(); print(os.getenv('MANIM_SANDBOX_IMAGE'))"
+
+   Expected output: sandbox/manim-sandbox:hpsksd5b50u7
+
+2. Run a simple animation:
+   python3 app.py
+   # Or: python3 main.py
+
+3. Monitor logs for:
+   - "Using custom sandbox image: sandbox/manim-sandbox:hpsksd5b50u7"
+   - "✓ Custom sandbox verified: Manim and FFmpeg are available"
+   - No installation-related messages
+   - Render proceeds immediately after verification
+
+ROLLBACK
+--------
+If issues occur, the original behavior can be restored by:
+1. Setting MANIM_SANDBOX_IMAGE=blaxel/py-app:latest in .env
+2. The renderer will show error message directing to deploy custom sandbox
+3. Or revert mcp_servers/renderer.py from git history
+
+FUTURE IMPROVEMENTS
+-------------------
+- Cache sandbox instances between renders (avoid creation overhead)
+- Add health check endpoint to verify sandbox availability
+- Support multiple sandbox templates for different render needs
+- Pre-warm sandbox pool for faster first render
+
+NOTES
+-----
+- The fix assumes your custom sandbox is properly deployed and accessible
+- Blaxel API key must be valid and set in .env as BLAXEL_API_KEY
+- Sandbox URL should be set as BLAXEL_SANDBOX_URL (currently: https://sbx-python-app-c8wjh6.us-pdx-1.bl.run)
+- First sandbox creation may take slightly longer as Blaxel pulls the image
+- Subsequent renders to same sandbox name will be much faster

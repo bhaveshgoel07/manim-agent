@@ -464,8 +464,7 @@ STRICT CODE REQUIREMENTS:
 8. Animations: Use ONLY these valid animations:
    - Write(), Create(), FadeIn(), FadeOut(), GrowFromCenter(), ShrinkToCenter()
    - Transform(), ReplacementTransform(), MoveToTarget(), ApplyMethod()
-   - Rotate(), Indicate(), Flash() - DO NOT use lowercase like 'flash'
-   - DO NOT use ShowCreation() (deprecated), use Create() instead
+   - Rotate(), Indicate(), Flash(), ShowCreation() - DO NOT use lowercase like 'flash'
    - For custom effects use .animate.method() (e.g., obj.animate.scale(2), obj.animate.shift(UP))
 9. Pacing: Include `self.wait(1)` between major animation groups
 

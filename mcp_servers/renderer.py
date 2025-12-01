@@ -380,31 +380,9 @@ async def render_manim_animation(arguments: Dict[str, Any]) -> CallToolResult:
     format_type = arguments.get("format", "mp4")
     frame_rate = arguments.get("frame_rate", 30)
 
-    # Try Blaxel sandbox rendering first
-    logger.info("Attempting to render using Blaxel sandbox...")
-    
-    # Check if Blaxel is configured (optional, but good practice)
-    # For now, we'll try it and catch exceptions
-    
-    try:
-        sandbox_result = await _render_manim_with_sandbox(
-            scene_name, file_path, output_dir, quality, format_type, frame_rate
-        )
-        
-        if not sandbox_result.get("isError", False):
-            return CallToolResult(
-                content=[TextContent(type="text", text=sandbox_result["text"])],
-                isError=False,
-            )
-        
-        logger.warning(f"Blaxel sandbox rendering failed: {sandbox_result.get('text')}")
-        logger.info("Falling back to local rendering...")
-        
-    except Exception as e:
-        logger.warning(f"Blaxel sandbox rendering error: {str(e)}")
-        logger.info("Falling back to local rendering...")
+    # Skip sandbox rendering and use local rendering directly with .venv
+    logger.info("Using local Manim rendering with .venv environment...")
 
-    # Fallback to local rendering
     local_result = await _render_manim_locally(
         scene_name, file_path, output_dir, quality, format_type, frame_rate
     )
@@ -1374,23 +1352,14 @@ async def merge_video_audio(arguments: Dict[str, Any]) -> CallToolResult:
         Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
         # Build FFmpeg merge command
-        # Build FFmpeg merge command
-        # Use tpad to extend the video stream to match audio duration (hold last frame)
-        # Then use -shortest to cut at the end of the audio
         cmd = [
             "ffmpeg",
             "-i",
             video_file,
             "-i",
             audio_file,
-            "-filter_complex",
-            "[0:v]tpad=stop_mode=clone:stop_duration=-1[v]",
-            "-map",
-            "[v]",
-            "-map",
-            "1:a",
             "-c:v",
-            "libx264",  # Must re-encode to extend video
+            "copy",
             "-c:a",
             "aac",
             "-shortest",

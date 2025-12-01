@@ -1,0 +1,9 @@
+name = "manim-sandbox"
+type = "sandbox"
+description = "Custom Manim + FFmpeg Sandbox"
+
+[runtime]
+memory = 4096  # 4GB RAM should be sufficient for rendering
+
+# Note: We do not explicitly list port 8080 here as it is injected by the sandbox-api
+# If you run a custom server (like a flask app) on another port (e.g., 3000), add it here.

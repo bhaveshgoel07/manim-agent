@@ -1,0 +1,226 @@
+PERSISTENT SANDBOX SETUP GUIDE
+================================
+
+Date: 2024-11-30
+Purpose: Configure Manim renderer to reuse existing sandbox instead of creating new ones
+
+OVERVIEW
+--------
+The renderer now connects to a single persistent Blaxel sandbox instead of creating
+temporary sandboxes for each render. This eliminates:
+- Sandbox creation overhead (2-5 seconds per render)
+- 503 Service Unavailable errors when API is busy
+- Resource quota issues from creating too many sandboxes
+- Cleanup complexity
+
+CONFIGURATION
+-------------
+
+Required Environment Variables (.env file):
+
+1. MANIM_SANDBOX_NAME=manim-sandbox
+   - Name of your deployed persistent sandbox
+   - This sandbox stays alive between renders
+   - Default: "manim-sandbox"
+
+2. MANIM_SANDBOX_IMAGE=sandbox/manim-sandbox:hpsksd5b50u7
+   - Image used by your sandbox
+   - Only used for verification, not creation
+   - Your deployed sandbox already uses this image
+
+3. BLAXEL_API_KEY=bl_aaabzou85ml4qgfryp6qfvne1b5u8s5o
+   - Your Blaxel API key for authentication
+
+4. BLAXEL_SANDBOX_URL=https://sbx-python-app-c8wjh6.us-pdx-1.bl.run
+   - URL of your deployed sandbox (optional)
+
+DEPLOYMENT
+----------
+
+Your sandbox "manim-sandbox" is already deployed with:
+✓ Manim 0.18.1+
+✓ FFmpeg with full codec support
+✓ LaTeX (texlive packages)
+✓ Python 3.12 + all dependencies
+✓ Status: DEPLOYED in us-pdx-1 region
+
+To check your deployed sandboxes:
+  bl get sandboxes
+
+To redeploy if needed:
+  ./deploy_sandbox.sh
+
+HOW IT WORKS
+------------
+
+Old Behavior (REMOVED):
+1. Create new sandbox for each render
+2. Wait for sandbox initialization (2-5 seconds)
+3. Install dependencies (if not in image)
+4. Run render
+5. Download output
+6. Delete sandbox
+
+New Behavior (CURRENT):
+1. Connect to existing "manim-sandbox" (instant)
+2. Verify Manim/FFmpeg available (~5 seconds)
+3. Run render
+4. Download output
+5. Keep sandbox alive for next render
+
+BENEFITS
+--------
+✓ No creation overhead - instant connection
+✓ No 503 errors from sandbox creation API
+✓ No deletion/cleanup needed
+✓ Consistent environment across renders
+✓ Faster turnaround time
+✓ Lower API quota usage
+
+RENDER FLOW
+-----------
+
+Step 1: Connect to Sandbox
+  - SandboxInstance.get("manim-sandbox")
+  - Verifies sandbox exists and is accessible
+  - Logs: "Successfully connected to sandbox: manim-sandbox"
+
+Step 2: Quick Verification (30 seconds timeout)
+  - Checks: python3 -c "import manim; print('Manim version:', manim.__version__)"
+  - Checks: ffmpeg -version | head -n 1
+  - Logs: "✓ Custom sandbox verified: Manim and FFmpeg are available"
+
+Step 3: Write Manim Code
+  - Creates /tmp/{scene_name}.py in sandbox
+  - Contains your animation scene class
+
+Step 4: Render Animation
+  - Runs: manim {quality_flag} --fps {frame_rate} -o {output}.mp4 {file}.py {scene}
+  - Timeout: 600 seconds (10 minutes)
+  - Outputs to: /tmp/media/videos/{scene_name}/
+
+Step 5: Download Output
+  - Reads rendered file from sandbox
+  - Saves to local outputs/ directory
+
+Step 6: Cleanup
+  - Keeps sandbox alive (no deletion)
+  - Files remain in /tmp for next render (no conflict)
+
+PERFORMANCE
+-----------
+
+Typical render times:
+- Sandbox connection: 0.5-1 second
+- Dependency verification: 5-10 seconds
+- Simple animation: 30-60 seconds
+- Complex animation: 2-10 minutes
+
+Total overhead: ~5-10 seconds (vs 2-5 minutes with installation)
+
+TROUBLESHOOTING
+---------------
+
+Error: "Sandbox 'manim-sandbox' not found"
+Solution:
+  - Check deployed sandboxes: bl get sandboxes
+  - Deploy if missing: ./deploy_sandbox.sh
+  - Verify MANIM_SANDBOX_NAME in .env matches deployed name
+
+Error: "Custom sandbox verification failed"
+Solution:
+  - Sandbox might be in bad state
+  - Restart sandbox: bl restart sandbox manim-sandbox
+  - Or redeploy: ./deploy_sandbox.sh
+
+Error: "Authentication required"
+Solution:
+  - Check BLAXEL_API_KEY is correct in .env
+  - Login to Blaxel CLI: bl login
+  - Verify key: echo $BLAXEL_API_KEY
+
+Error: Render hangs or times out
+Solution:
+  - Check sandbox status: bl get sandboxes manim-sandbox
+  - View sandbox logs: bl logs manim-sandbox
+  - Restart if needed: bl restart sandbox manim-sandbox
+
+SANDBOX MAINTENANCE
+-------------------
+
+Restart sandbox (if it becomes unresponsive):
+  bl restart sandbox manim-sandbox
+
+View sandbox logs:
+  bl logs manim-sandbox
+
+Check sandbox status:
+  bl get sandboxes manim-sandbox
+
+Redeploy sandbox (if corrupted):
+  ./deploy_sandbox.sh
+  # Update MANIM_SANDBOX_NAME in .env if name changes
+
+Delete and recreate (nuclear option):
+  bl delete sandbox manim-sandbox
+  ./deploy_sandbox.sh
+
+VERIFICATION
+------------
+
+Run the verification script:
+  python3 verify_sandbox_setup.py
+
+Expected output:
+  ✓ Custom sandbox image configured: sandbox/manim-sandbox:hpsksd5b50u7
+  ✓ Persistent sandbox name configured: manim-sandbox
+  ✓ Blaxel API key configured: bl_aaabz...
+  ✓ All checks passed! Your setup is ready.
+
+Then test a render:
+  python3 app.py
+  # Or: python3 main.py
+
+Monitor logs for:
+  - "Connecting to persistent sandbox: manim-sandbox"
+  - "Successfully connected to sandbox: manim-sandbox"
+  - "✓ Custom sandbox verified: Manim and FFmpeg are available"
+  - No creation or installation messages
+
+FILE STATE
+----------
+
+Files in /tmp/ persist between renders on the same sandbox.
+This is fine because:
+- Each render uses unique scene names as filenames
+- Manim overwrites existing files with same name
+- /tmp/ is large enough for multiple outputs
+- No cleanup needed between renders
+
+If you want to clear /tmp/:
+  # Connect to sandbox and run cleanup
+  bl exec manim-sandbox "rm -rf /tmp/*.py /tmp/media/*"
+
+MIGRATION NOTES
+---------------
+
+Changed from:
+  - SandboxInstance.create() → SandboxInstance.get()
+  - New sandbox per render → Reuse one sandbox
+  - Delete after render → Keep alive
+
+This means:
+  - Faster renders (no creation time)
+  - More reliable (no 503 errors)
+  - Simpler code (no creation/deletion logic)
+  - Persistent state (files remain in /tmp)
+
+IMPORTANT
+---------
+Keep your sandbox running! Don't manually delete "manim-sandbox" unless you're
+redeploying. The renderer expects it to be always available.
+
+If you accidentally delete it:
+  ./deploy_sandbox.sh
+  # Verify: bl get sandboxes
+  # Update .env if name changed

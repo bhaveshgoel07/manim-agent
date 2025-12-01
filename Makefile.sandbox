@@ -1,0 +1,87 @@
+# Makefile for Blaxel Manim Sandbox
+
+IMAGE_NAME = manim-sandbox
+CONTAINER_NAME = manim-sandbox-test
+PORT = 8080
+
+.PHONY: build run stop clean test logs help
+
+# Default target
+help:
+	@echo "Blaxel Manim Sandbox Makefile"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  build       - Build the Docker image"
+	@echo "  run         - Run the container locally"
+	@echo "  stop        - Stop the running container"
+	@echo "  clean       - Remove container and image"
+	@echo "  test        - Test the sandbox API"
+	@echo "  logs        - View container logs"
+	@echo "  shell       - Open shell in running container"
+	@echo "  deploy      - Deploy to Blaxel (requires bl CLI)"
+
+# Build the Docker image
+build:
+	@echo "Building Docker image..."
+	docker build -f Dockerfile.sandbox -t $(IMAGE_NAME) .
+	@echo "Build complete!"
+
+# Run the container locally
+run:
+	@echo "Starting container..."
+	docker run -d \
+		--name $(CONTAINER_NAME) \
+		-p $(PORT):8080 \
+		$(IMAGE_NAME)
+	@echo "Container started on port $(PORT)"
+	@echo "Sandbox API available at http://localhost:$(PORT)"
+
+# Stop the container
+stop:
+	@echo "Stopping container..."
+	-docker stop $(CONTAINER_NAME)
+	-docker rm $(CONTAINER_NAME)
+	@echo "Container stopped"
+
+# Clean up everything
+clean: stop
+	@echo "Removing image..."
+	-docker rmi $(IMAGE_NAME)
+	@echo "Cleanup complete"
+
+# Test the sandbox API
+test:
+	@echo "Testing sandbox API..."
+	@echo ""
+	@echo "1. Health check:"
+	curl -s http://localhost:$(PORT)/health || echo "Failed"
+	@echo ""
+	@echo ""
+	@echo "2. Testing Manim installation:"
+	curl -s -X POST http://localhost:$(PORT)/process \
+		-H "Content-Type: application/json" \
+		-d '{"command": "manim --version", "waitForCompletion": true}' | jq '.' || echo "Failed"
+	@echo ""
+	@echo "3. Testing FFmpeg installation:"
+	curl -s -X POST http://localhost:$(PORT)/process \
+		-H "Content-Type: application/json" \
+		-d '{"command": "ffmpeg -version", "waitForCompletion": true}' | jq '.' || echo "Failed"
+
+# View container logs
+logs:
+	docker logs -f $(CONTAINER_NAME)
+
+# Open shell in running container
+shell:
+	docker exec -it $(CONTAINER_NAME) /bin/bash
+
+# Deploy to Blaxel
+deploy:
+	@echo "Deploying to Blaxel..."
+	bl deploy
+	@echo "Deployment complete!"
+	@echo "Check status with: bl get sandbox manim-sandbox --watch"
+
+# Rebuild and run (convenience target)
+rebuild: clean build run
+	@echo "Rebuild complete and container running"
