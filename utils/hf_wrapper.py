@@ -330,8 +330,8 @@ class ModelConfig(BaseModel):
     code_models: List[str] = Field(
         default_factory=lambda: [
             # Primary code-capable models
-            "zai-org/GLM-4.6",
             "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+            "zai-org/GLM-4.6",
             "meta-llama/CodeLlama-70b-Instruct-hf",
             # Kept last because it has caused auth issues in practice
             "ZhipuAI/glm-4-9b-chat",
