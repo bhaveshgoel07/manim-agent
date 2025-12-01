@@ -8,6 +8,36 @@ wheels/
 
 # Virtual environments
 .venv
-outputs/
-outputs/
+venv/
+env/
+
+# Environment variables (IMPORTANT: Never commit API keys!)
 .env
+
+# Docker
+*.bak
+
+# Sandbox deployment artifacts
+.docker/
+
+# Output files
+outputs/
+animations/
+test_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.env
+.env.*
+.txt
+
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

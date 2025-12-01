@@ -383,9 +383,6 @@ async def render_manim_animation(arguments: Dict[str, Any]) -> CallToolResult:
     # Try Blaxel sandbox rendering first
     logger.info("Attempting to render using Blaxel sandbox...")
     
-    # Check if Blaxel is configured (optional, but good practice)
-    # For now, we'll try it and catch exceptions
-    
     try:
         sandbox_result = await _render_manim_with_sandbox(
             scene_name, file_path, output_dir, quality, format_type, frame_rate
