@@ -380,9 +380,32 @@ async def render_manim_animation(arguments: Dict[str, Any]) -> CallToolResult:
     format_type = arguments.get("format", "mp4")
     frame_rate = arguments.get("frame_rate", 30)
 
-    # Skip sandbox rendering and use local rendering directly with .venv
-    logger.info("Using local Manim rendering with .venv environment...")
-
+    # Try Blaxel sandbox rendering first
+    logger.info("Attempting to render using Blaxel sandbox...")
+    
+    # Check if Blaxel is configured (optional, but good practice)
+    # For now, we'll try it and catch exceptions
+    
+    try:
+        sandbox_result = await _render_manim_with_sandbox(
+            scene_name, file_path, output_dir, quality, format_type, frame_rate
+        )
+        
+        if not sandbox_result.get("isError", False):
+            return CallToolResult(
+                content=[TextContent(type="text", text=sandbox_result["text"])],
+                isError=False,
+            )
+        
+        logger.warning(f"Blaxel sandbox rendering failed: {sandbox_result.get('text')}")
+        logger.info("Falling back to local rendering...")
+        
+    except Exception as e:
+        logger.warning(f"Blaxel sandbox rendering error: {str(e)}")
+        logger.info("Falling back to local rendering...")
+    
+    # Fallback to local rendering
+    logger.info("Using local Manim rendering...")
     local_result = await _render_manim_locally(
         scene_name, file_path, output_dir, quality, format_type, frame_rate
     )
